@@ -67,6 +67,8 @@
                         <p class="text-lg"><strong class="font-medium text-gray-900">Chandas Name:</strong> <span id="chandas-name" class="text-orange-700 font-semibold"></span></p>
                         <p class="text-lg"><strong class="font-medium text-gray-900">Syllable Count:</strong> <span id="syllable-count"></span></p>
                         <p class="text-lg"><strong class="font-medium text-gray-900">L/G Pattern:</strong> <span id="lg-pattern" class="font-mono"></span></p>
+                        <!-- NEW Gana Pattern Display -->
+                        <p class="text-lg"><strong class="font-medium text-gray-900">Gana Pattern:</strong> <span id="gana-pattern" class="font-mono"></span></p>
                         <p class="text-lg"><strong class="font-medium text-gray-900">Description:</strong> <span id="chandas-description" class="text-gray-600"></span></p>
                     </div>
                 </div>
@@ -126,6 +128,7 @@
         const chandasName = document.getElementById('chandas-name');
         const syllableCountEl = document.getElementById('syllable-count');
         const lgPatternEl = document.getElementById('lg-pattern');
+        const ganaPatternEl = document.getElementById('gana-pattern'); // New element
         const chandasDescription = document.getElementById('chandas-description');
 
 
@@ -136,6 +139,11 @@
         const SHORT_MATRAS = new Set(['ि', 'ु', 'ृ']);
         const MODIFIERS = new Set(['ं', 'ः']); // Anusvara, Visarga
         const HALANT = '्';
+        const GANA_MAP = { // New Gana Map
+            "LGG": "ya (य)", "GGG": "ma (म)", "GGL": "ta (त)",
+            "GLG": "ra (र)", "LGL": "ja (ज)", "GLL": "bha (भ)",
+            "LLL": "na (न)", "LLG": "sa (स)"
+        };
 
         function syllabify(text) {
             const syllables = [];
@@ -209,6 +217,29 @@
             return pattern;
         }
 
+        // New function for Gana Analysis
+        function getGanaPattern(lgPattern) {
+            if (!lgPattern) return "N/A";
+            const ganaResult = [];
+            let i = 0;
+            while (i + 2 < lgPattern.length) {
+                const triplet = lgPattern.substring(i, i + 3);
+                const gana = GANA_MAP[triplet];
+                if (gana) {
+                    ganaResult.push(gana);
+                }
+                i += 3;
+            }
+            const leftovers = lgPattern.substring(i);
+            for (const char of leftovers) {
+                ganaResult.push(char);
+            }
+            if (ganaResult.length === 0 && lgPattern.length > 0) {
+                 return "Not enough syllables for Gana analysis.";
+            }
+            return ganaResult.join(', ');
+        }
+
         function displayLgPatternOnShloka(syllables, lgPattern) {
             let html = "";
             for (let i = 0; i < syllables.length; i++) {
@@ -244,6 +275,9 @@
                 // 2. Get L/G Pattern
                 const lgPattern = getLgPattern(syllables);
 
+                // 2.5 Get Gana Pattern
+                const ganaPattern = getGanaPattern(lgPattern);
+
                 // 3. Query Firestore
                 const chandasRef = collection(db, "chandas");
                 const q = query(chandasRef, where("lgPattern", "==", lgPattern), limit(1));
@@ -258,12 +292,14 @@
                     chandasName.textContent = "Unknown / Not Found";
                     syllableCountEl.textContent = syllables.length;
                     lgPatternEl.textContent = lgPattern;
+                    ganaPatternEl.textContent = ganaPattern; // Display Gana pattern
                     chandasDescription.textContent = "Could not find a matching Chandas in the database for this specific Laghu/Guru pattern.";
                 } else {
                     const docData = querySnapshot.docs[0].data();
                     chandasName.textContent = docData.name;
                     syllableCountEl.textContent = docData.syllableCount;
                     lgPatternEl.textContent = docData.lgPattern;
+                    ganaPatternEl.textContent = ganaPattern; // Display Gana pattern
                     chandasDescription.textContent = docData.description;
                 }
 
@@ -279,3 +315,4 @@
     </script>
 </body>
 </html>
+
