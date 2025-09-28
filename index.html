@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chandas Identifier | वैदिक मीटर पहिचान</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tiro+Devanagari+Sanskrit&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .devanagari {
+            font-family: 'Tiro Devanagari Sanskrit', serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto px-4 py-8 md:py-16 min-h-screen flex flex-col items-center">
+        
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-orange-600 devanagari">छन्दः शास्त्रम्</h1>
+            <p class="text-xl md:text-2xl mt-2 text-gray-600">Chandas Identifier</p>
+            <p class="mt-4 max-w-2xl mx-auto text-gray-500">
+                Enter a line of a Sanskrit shloka below to identify its meter (Chandas). The program will classify each syllable as Laghu (Short) or Guru (Long) and query our database to find a match.
+            </p>
+        </header>
+
+        <!-- Main Card -->
+        <main class="w-full max-w-3xl bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+            
+            <div class="mb-6">
+                <label for="shloka-input" class="block text-lg font-medium text-gray-700 mb-2">Enter Shloka (in Devanagari)</label>
+                <textarea id="shloka-input" rows="4" class="devanagari w-full text-xl p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-shadow duration-200" placeholder="धर्मक्षेत्रे कुरुक्षेत्रे समवेता युयुत्सवः"></textarea>
+            </div>
+
+            <button id="identify-button" class="w-full bg-orange-600 text-white text-lg font-semibold py-3 px-6 rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-4 focus:ring-orange-300 transition-all duration-300 transform hover:scale-105">
+                Identify Chandas
+            </button>
+
+            <!-- Results Section -->
+            <div id="results-section" class="mt-8 pt-6 border-t border-gray-200 hidden">
+                <!-- Loader -->
+                <div id="loader" class="text-center hidden">
+                    <svg class="animate-spin h-8 w-8 text-orange-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-2 text-gray-500">Analyzing syllables and querying database...</p>
+                </div>
+                
+                <!-- Content -->
+                <div id="results-content">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Analysis Result</h2>
+                    
+                    <!-- L/G Pattern Display -->
+                    <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                        <p class="text-sm text-gray-600 mb-2">Syllable Pattern (Laghu/Guru):</p>
+                        <div id="lg-pattern-display" class="devanagari text-2xl tracking-widest text-center"></div>
+                    </div>
+
+                    <div id="chandas-info" class="space-y-3">
+                        <p class="text-lg"><strong class="font-medium text-gray-900">Chandas Name:</strong> <span id="chandas-name" class="text-orange-700 font-semibold"></span></p>
+                        <p class="text-lg"><strong class="font-medium text-gray-900">Syllable Count:</strong> <span id="syllable-count"></span></p>
+                        <p class="text-lg"><strong class="font-medium text-gray-900">L/G Pattern:</strong> <span id="lg-pattern" class="font-mono"></span></p>
+                        <p class="text-lg"><strong class="font-medium text-gray-900">Description:</strong> <span id="chandas-description" class="text-gray-600"></span></p>
+                    </div>
+                </div>
+
+                 <!-- Error Message -->
+                <div id="error-message" class="hidden text-center text-red-600 bg-red-50 p-4 rounded-lg">
+                </div>
+            </div>
+        </main>
+        
+        <footer class="text-center mt-12 text-gray-400">
+            <p>&copy; 2024 Chandas Shastra Project. Built with Firebase and Vanilla JS.</p>
+        </footer>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // --- Firebase Configuration ---
+        // TODO: Replace with your actual Firebase project configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAx81GOPlwOjgvoqcfnzzQ9qw5jOtl0ujQ",
+            authDomain: "chandas-identifiy.firebaseapp.com",
+            projectId: "chandas-identifiy",
+            storageBucket: "chandas-identifiy.firebasestorage.app",
+            messagingSenderId: "336245691633",
+            appId: "1:336245691633:web:4bfbb31f9599b0e824c550"
+        };
+
+        // --- App Initialization ---
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            console.log("Firebase initialized successfully.");
+        } catch (e) {
+            console.error("Error initializing Firebase:", e);
+            const resultsSection = document.getElementById('results-section');
+            const errorEl = document.getElementById('error-message');
+            resultsSection.classList.remove('hidden');
+            errorEl.classList.remove('hidden');
+            errorEl.textContent = 'Firebase configuration is missing or invalid. Please check your credentials in the script.';
+        }
+        
+
+        // --- DOM Elements ---
+        const shlokaInput = document.getElementById('shloka-input');
+        const identifyButton = document.getElementById('identify-button');
+        const resultsSection = document.getElementById('results-section');
+        const loader = document.getElementById('loader');
+        const resultsContent = document.getElementById('results-content');
+        const errorMessage = document.getElementById('error-message');
+        const lgPatternDisplay = document.getElementById('lg-pattern-display');
+        const chandasName = document.getElementById('chandas-name');
+        const syllableCountEl = document.getElementById('syllable-count');
+        const lgPatternEl = document.getElementById('lg-pattern');
+        const chandasDescription = document.getElementById('chandas-description');
+
+
+        // --- Core Logic: Syllable Analysis ---
+        const VOWELS = new Set(['अ', 'आ', 'इ', 'ई', 'उ', 'ऊ', 'ऋ', 'ॠ', 'ऌ', 'ए', 'ऐ', 'ओ', 'औ']);
+        const SHORT_VOWELS = new Set(['अ', 'इ', 'उ', 'ऋ', 'ऌ']);
+        const MATRAS = new Set(['ा', 'ि', 'ी', 'ु', 'ू', 'ृ', 'ॄ', 'े', 'ै', 'ो', 'ौ']);
+        const SHORT_MATRAS = new Set(['ि', 'ु', 'ृ']);
+        const MODIFIERS = new Set(['ं', 'ः']); // Anusvara, Visarga
+        const HALANT = '्';
+
+        function syllabify(text) {
+            const syllables = [];
+            let currentSyllable = "";
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                if (VOWELS.has(char) || MATRAS.has(char)) {
+                    currentSyllable += char;
+                    syllables.push(currentSyllable);
+                    currentSyllable = "";
+                } else if (char === HALANT) {
+                    if (currentSyllable) {
+                         currentSyllable += char;
+                    }
+                } else if (char.trim() !== '') { // Consonants and modifiers
+                    if (currentSyllable.length > 0 && !currentSyllable.endsWith(HALANT)) {
+                        syllables.push(currentSyllable);
+                        currentSyllable = "";
+                    }
+                    currentSyllable += char;
+                }
+            }
+            if (currentSyllable) {
+                syllables.push(currentSyllable);
+            }
+            return syllables.filter(s => s.trim() !== '');
+        }
+
+        function getLgPattern(syllables) {
+            let pattern = "";
+            for (let i = 0; i < syllables.length; i++) {
+                const syllable = syllables[i];
+                let isGuru = false;
+
+                // Rule: Last syllable of the line is always Guru
+                if (i === syllables.length - 1) {
+                    isGuru = true;
+                } else {
+                    // Rule: Contains a long vowel or matra
+                    for (const char of syllable) {
+                        if (!SHORT_VOWELS.has(char) && VOWELS.has(char)) isGuru = true;
+                        if (!SHORT_MATRAS.has(char) && MATRAS.has(char)) isGuru = true;
+                    }
+
+                    // Rule: Followed by Anusvara or Visarga
+                    if (MODIFIERS.has(syllable.slice(-1))) {
+                        isGuru = true;
+                    }
+                    
+                    // Rule: Followed by a conjunct consonant
+                    const nextSyllable = syllables[i+1];
+                    if (nextSyllable) {
+                        let consonantCount = 0;
+                        for(let j=0; j < nextSyllable.length; j++){
+                            const char = nextSyllable[j];
+                            if(!VOWELS.has(char) && !MATRAS.has(char) && char !== HALANT) {
+                                consonantCount++;
+                            }
+                            if(VOWELS.has(char) || MATRAS.has(char)){
+                                break;
+                            }
+                        }
+                        if (consonantCount > 1) {
+                            isGuru = true;
+                        }
+                    }
+                }
+                pattern += isGuru ? 'G' : 'L';
+            }
+            return pattern;
+        }
+
+        function displayLgPatternOnShloka(syllables, lgPattern) {
+            let html = "";
+            for (let i = 0; i < syllables.length; i++) {
+                html += `<div class="inline-block text-center mx-1">
+                            <span class="font-bold text-orange-600">${lgPattern[i]}</span>
+                            <span class="block">${syllables[i]}</span>
+                         </div>`;
+            }
+            lgPatternDisplay.innerHTML = html;
+        }
+
+        // --- Event Listener ---
+        identifyButton.addEventListener('click', async () => {
+            const shlokaText = shlokaInput.value.trim();
+            if (!shlokaText) {
+                errorMessage.textContent = 'Please enter a shloka to analyze.';
+                errorMessage.classList.remove('hidden');
+                resultsSection.classList.add('hidden');
+                return;
+            }
+
+            // Reset UI
+            resultsSection.classList.remove('hidden');
+            loader.classList.remove('hidden');
+            resultsContent.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+
+            try {
+                // 1. Syllabify
+                const syllables = syllabify(shlokaText);
+                if (syllables.length === 0) throw new Error("Could not parse the shloka into syllables. Please check the input.");
+                
+                // 2. Get L/G Pattern
+                const lgPattern = getLgPattern(syllables);
+
+                // 3. Query Firestore
+                const chandasRef = collection(db, "chandas");
+                const q = query(chandasRef, where("lgPattern", "==", lgPattern), limit(1));
+                const querySnapshot = await getDocs(q);
+
+                loader.classList.add('hidden');
+                resultsContent.classList.remove('hidden');
+                
+                displayLgPatternOnShloka(syllables, lgPattern);
+
+                if (querySnapshot.empty) {
+                    chandasName.textContent = "Unknown / Not Found";
+                    syllableCountEl.textContent = syllables.length;
+                    lgPatternEl.textContent = lgPattern;
+                    chandasDescription.textContent = "Could not find a matching Chandas in the database for this specific Laghu/Guru pattern.";
+                } else {
+                    const docData = querySnapshot.docs[0].data();
+                    chandasName.textContent = docData.name;
+                    syllableCountEl.textContent = docData.syllableCount;
+                    lgPatternEl.textContent = docData.lgPattern;
+                    chandasDescription.textContent = docData.description;
+                }
+
+            } catch (error) {
+                console.error("Error identifying chandas:", error);
+                loader.classList.add('hidden');
+                errorMessage.textContent = error.message;
+                errorMessage.classList.remove('hidden');
+                resultsContent.classList.add('hidden');
+            }
+        });
+
+    </script>
+</body>
+</html>
